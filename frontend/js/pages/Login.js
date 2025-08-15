@@ -7,35 +7,41 @@ function loadUsers() { try { return JSON.parse(localStorage.getItem(CFG_USERS_KE
 async function sha256Hex(text) {
   const enc = new TextEncoder().encode(text);
   const buf = await crypto.subtle.digest("SHA-256", enc);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
-function b64utf8(s) { return btoa(unescape(encodeURIComponent(s))); }
+function b64utf8(s){ return btoa(unescape(encodeURIComponent(s))); }
 async function verifyPassword(passHash, plainInput) {
   if (!passHash) return plainInput === "";
   if (passHash.startsWith("sha256:")) return (await sha256Hex(plainInput)) === passHash.slice(7);
-  if (passHash.startsWith("weak:")) return b64utf8(plainInput) === passHash.slice(5);
+  if (passHash.startsWith("weak:"))   return b64utf8(plainInput) === passHash.slice(5);
   return false;
 }
 function matchUserIdentifier(user, ident) {
-  const id = String(ident || "").trim().toLowerCase();
+  const id = String(ident||"").trim().toLowerCase();
   if (!id) return false;
-  const uEmail = String(user.email || "").trim().toLowerCase();
-  const uUser = String(user.username || "").trim().toLowerCase();
+  const uEmail = String(user.email||"").trim().toLowerCase();
+  const uUser  = String(user.username||"").trim().toLowerCase();
   return id === uEmail || id === uUser;
 }
-function sanitizeUser(u) { const { passHash, ...rest } = u || {}; return rest; }
+function sanitizeUser(u){ const { passHash, ...rest } = u || {}; return rest; }
 
 // ===== API helper (D1 via Functions) =====
 async function apiLogin(identifier, password) {
+  // normalizar: si es email, usar lowercase
+  const ident = (identifier.includes("@") ? identifier.toLowerCase() : identifier);
+
   const res = await fetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "include",               // cookie httpOnly
-    body: JSON.stringify({ identifier, password })
+    credentials: "include",
+    body: JSON.stringify({ identifier: ident, password })
   });
   const isJSON = res.headers.get("content-type")?.includes("application/json");
   const data = isJSON ? await res.json() : await res.text();
-  if (!res.ok) throw new Error((data && data.error) || data || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const msg = (data && data.error) || data || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
   return data; // { id, email, username, role, branch_id, full_name, perms }
 }
 
@@ -80,7 +86,7 @@ export default {
                 </label>
               </div>
 
-              <button class="w-full py-2 rounded bg-indigo-600/80 hover:bg-indigo-600 transition font-medium">
+              <button type="submit" class="w-full py-2 rounded bg-indigo-600/80 hover:bg-indigo-600 transition font-medium">
                 Entrar
               </button>
 
@@ -96,13 +102,13 @@ export default {
   },
 
   mount(root) {
-    const form = root.querySelector("#loginForm");
-    const pass = root.querySelector("#pass");
+    const form   = root.querySelector("#loginForm");
+    const pass   = root.querySelector("#pass");
     const toggle = root.querySelector("#togglePass");
-    const error = root.querySelector("#loginError");
+    const error  = root.querySelector("#loginError");
 
-    const showError = (msg) => { error.textContent = msg; error.classList.remove("hidden"); };
-    const clearError = () => { error.textContent = ""; error.classList.add("hidden"); };
+    const showError = (msg)=>{ error.textContent = msg; error.classList.remove("hidden"); };
+    const clearError = ()=>{ error.textContent = ""; error.classList.add("hidden"); };
 
     toggle?.addEventListener("click", () => {
       const isPass = pass.type === "password";
@@ -116,26 +122,31 @@ export default {
 
       const FD = new FormData(form);
       const identifier = (FD.get("identifier") || "").toString().trim();
-      const password = (FD.get("password") || "").toString();
+      const password   = (FD.get("password")   || "").toString();
 
-      // Validación simple sin alerts
       if (!identifier || !password) {
         showError("Completá usuario/email y contraseña.");
         return;
       }
 
-      // ===== 1) Intento contra D1 (API oficial) =====
+      const submitBtn = form.querySelector('button[type="submit"], button:not([type])');
+      submitBtn && (submitBtn.disabled = true);
+
       try {
+        // 1) API D1
         const me = await apiLogin(identifier, password);
-        setAuth({ token: "cookie", user: me });       // cookie httpOnly almacenada por el navegador
+        setAuth({ token: "cookie", user: me });
         location.hash = "#/dashboard";
         return;
       } catch (err) {
-        // Sin alerts: log discreto
-        console.warn("[login] API error o credenciales inválidas, fallback local", err?.message || err);
+        const msg = (err && err.message) ? err.message : "Error al iniciar sesión";
+        showError(msg); // p.ej., "Credenciales inválidas"
+        console.warn("[login] api error", msg);
+      } finally {
+        submitBtn && (submitBtn.disabled = false);
       }
 
-      // ===== 2) Fallback: modo local (lo que ya tenías) =====
+      // 2) Fallback local
       const users = loadUsers();
       if (!Array.isArray(users) || users.length === 0) {
         showError("No hay usuarios configurados. Creá uno en Configuración → Usuarios.");
@@ -144,7 +155,6 @@ export default {
 
       const user = users.find(u => matchUserIdentifier(u, identifier));
       if (!user) { showError("Usuario o email no encontrado."); return; }
-
       if (user.active === false) { showError("El usuario está inactivo."); return; }
 
       const ok = await verifyPassword(user.passHash || "", password);
