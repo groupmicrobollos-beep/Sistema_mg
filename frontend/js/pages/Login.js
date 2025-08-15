@@ -35,19 +35,8 @@ async function apiLogin(email, password) {
   });
   const isJSON = res.headers.get("content-type")?.includes("application/json");
   const data = isJSON ? await res.json() : await res.text();
-  if (!res.ok) {
-    const err = new Error((data && data.error) || data || `HTTP ${res.status}`);
-    err.status = res.status; err.data = data;
-    throw err;
-  }
+  if (!res.ok) throw new Error((data && data.error) || data || `HTTP ${res.status}`);
   return data; // { id, email, role, branch_id, full_name, perms }
-}
-
-function canUseLocalFallback(err) {
-  // Solo permitimos fallback en desarrollo local o si el endpoint no existe en este host
-  if (location.protocol === "file:" || location.hostname === "localhost") return true;
-  if (err && err.status === 404) return true; // /api no existe en este host
-  return false;
 }
 
 export default {
@@ -129,33 +118,15 @@ export default {
       const identifier = (FD.get("identifier") || "").toString().trim();
       const password   = (FD.get("password")   || "").toString();
 
-      // Validar que sea email (el backend busca por email)
-      if (!identifier.includes("@")) {
-        showError("Ingresá el email completo (ej. admin@pos.local).");
-        return;
-      }
-
       // ===== 1) Intento contra D1 (API oficial) =====
       try {
+        // En el API usamos 'email'; si escriben usuario sin @, dejamos igual (el endpoint espera email)
         const me = await apiLogin(identifier, password);
-
-        // chequeo extra: validar que la cookie quedó
-        const chk = await fetch("/api/auth/me", { credentials: "include" });
-        if (!chk.ok) {
-          showError("No se pudo establecer la sesión. Revisá que el navegador permita cookies.");
-          return;
-        }
-
-        setAuth({ token: "cookie", user: me });  // cookie httpOnly guardada por el navegador
-        location.replace("#/dashboard");
+        setAuth({ token: "cookie", user: me });       // cookie httpOnly almacenada por el navegador
+        location.hash = "#/dashboard";
         return;
       } catch (err) {
-        // En PRODUCCIÓN no caemos a modo local salvo que sea un entorno sin /api
-        if (!canUseLocalFallback(err)) {
-          showError(err?.message || "Servidor fuera de línea o credenciales inválidas.");
-          return;
-        }
-        // Si estamos en file://, localhost o el endpoint no existe, usamos el modo local
+        // Si el endpoint no existe aún / o credenciales invalidas, probamos fallback local
         // console.warn("API login falló, probando modo local:", err);
       }
 
@@ -168,6 +139,7 @@ export default {
 
       const user = users.find(u => matchUserIdentifier(u, identifier));
       if (!user) { showError("Usuario o email no encontrado."); return; }
+
       if (user.active === false) { showError("El usuario está inactivo."); return; }
 
       const ok = await verifyPassword(user.passHash || "", password);
@@ -176,7 +148,7 @@ export default {
       const token = `mb:${user.id}:${Date.now()}`;
       const safeUser = sanitizeUser(user);
       setAuth({ token, user: safeUser });
-      location.replace("#/dashboard");
+      location.hash = "#/dashboard";
     });
   }
 };
