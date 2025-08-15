@@ -1,9 +1,10 @@
 # wrangler.toml (en la RAÍZ del repo)
 name = "sistema-mg"                # (opcional; el proyecto de Pages lo fijamos con --project-name)
 compatibility_date = "2025-08-14"  # o la fecha de hoy (no futura)
-pages_build_output_dir = "."       # <- IMPORTANTÍSIMO: servimos desde la raíz
+pages_build_output_dir = "frontend"       # <- IMPORTANTÍSIMO: servimos desde la raíz
 
 [[d1_databases]]
 binding = "DB"
 database_name = "pos_db"
 database_id = "bff28cad-c889-455b-b86d-2ebb70eae11a"  # tu UUID
+
