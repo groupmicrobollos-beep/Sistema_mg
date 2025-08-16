@@ -435,11 +435,11 @@ export default {
       userForm.reset();
       F.uid.value = data?.id || rid("usr");
       F.username.value = data?.username || "";
-      F.name.value = data?.name || "";
+      F.name.value = data?.full_name || "";
       F.role.value = data?.role || "admin";
       F.email.value = data?.email || "";
       F.phone.value = data?.phone || "";
-      paintBranchesSelect(F.branchId, branches, data?.branchId || "", false);
+      paintBranchesSelect(F.branchId, branches, data?.branch_id || "", false);
       F.active.checked = data?.active ?? true;
 
       // Permisos avanzados
@@ -569,11 +569,14 @@ export default {
     }
     async function loadUsers() {
       try {
+        console.log("Cargando usuarios...");
         const res = await fetch("/api/users/list", {
           credentials: "include"
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        users = await res.json();
+        const data = await res.json();
+        console.log("Usuarios recibidos:", data);
+        users = data;
         repaintUsers();
       } catch (err) {
         console.error("[loadUsers] error:", err);
