@@ -105,9 +105,8 @@ export const onRequestPost = async ({ request, env }) => {
         return json({ error: "Credenciales inválidas" }, 401, request);
     }
 
-    // 3) Verificar hash (tolerante a casing en DB)
-    const hash = await sha256Hex(pass + user.salt);
-    if (hash.toLowerCase() !== String(user.password_hash).toLowerCase()) {
+    // 3) Verificar contraseña
+    if (pass !== user.password_hash) {
         return json({ error: "Credenciales inválidas" }, 401, request);
     }
 
