@@ -476,11 +476,10 @@ export default {
       return {
         id: F.uid.value,
         username: F.username.value.trim(),
-        name: F.name.value.trim(),
+        full_name: F.name.value.trim(),
         role: F.role.value,
         email: F.email.value.trim(),
-        phone: F.phone.value.trim(),
-        branchId: F.branchId.value || "",
+        branch_id: F.branchId.value || "",
         active: !!F.active.checked,
         perms: pFinal
       };
@@ -591,22 +590,22 @@ export default {
       const fb = filterBranch.value || "";
 
       const view = users.filter(u=>{
-        const matchesTerm = !term || [u.username,u.name,u.email,u.phone].join(" ").toLowerCase().includes(term);
+        const matchesTerm = !term || [u.username,u.full_name,u.email].join(" ").toLowerCase().includes(term);
         const matchesRole = !fr || u.role === fr;
-        const matchesBranch = !fb || (u.branchId||"") === fb;
+        const matchesBranch = !fb || (u.branch_id||"") === fb;
         return matchesTerm && matchesRole && matchesBranch;
       });
       const rows = view.map(u=>{
         const roleName = ROLES.find(r=>r.id===u.role)?.name || u.role || "-";
-        const bName = (branches.find(b=>b.id===u.branchId)?.name) || "—";
+        const bName = (branches.find(b=>b.id===u.branch_id)?.name) || "—";
         const st = u.active ? `<span class="pill" style="color:#86efac;background:#16a34a33">Activo</span>` : `<span class="pill" style="color:#fca5a5;background:#dc262633">Inactivo</span>`;
         return `
         <tr class="hover:bg-white/5">
           <td class="font-medium">${u.username}</td>
-          <td>${u.name || "-"}</td>
+          <td>${u.full_name || "-"}</td>
           <td>${roleName}</td>
           <td>${u.email || "-"}</td>
-          <td>${u.phone || "-"}</td>
+          <td>-</td>
           <td>${bName}</td>
           <td>${st}</td>
           <td class="text-right whitespace-nowrap">
